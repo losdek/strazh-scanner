@@ -63,7 +63,7 @@ event({event:'started'});
 event({...batch(0, 5), rows:Array.from({length:5},(_,j)=>row(j,'unknown')), matches:0, done:true, files:5});
 assert.equal(get('#verdict').dataset.state,'safe');
 assert.equal(get('#emptyList').hidden,false);
-assert.match(get('#emptyList').textContent, /5 файлов чистые/);
+assert.match(get('#emptyList').textContent, /все проверенные файлы чистые \(5\)/);
 get('#clear').handlers.click();
 assert.equal(get('#scanList').children.length,0);
 assert.equal(get('#scan').hidden,true);

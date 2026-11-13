@@ -1,7 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const ru = (n) => n.toLocaleString('ru-RU');
 let running = false;
-let lastMode = 'static';
 let modeTouched = false;
 let configured = false;
 let clamReady = false;
@@ -202,7 +201,7 @@ function updateListChrome() {
   let message = '';
   if (query && visibleProblems === 0 && (!showAll || cleanMatches === 0)) message = 'Ничего не найдено.';
   else if (!query && !showAll && visibleProblems === 0 && lastTotals.files > 0)
-    message = lastTotals.done ? `Проблемных файлов нет. Остальные ${files(clean.length)} чистые.` : 'Пока проблем не найдено.';
+    message = lastTotals.done ? `Проблемных файлов нет — ${plural(clean.length, 'проверенный файл чистый', 'все проверенные файлы чистые', 'все проверенные файлы чистые')} (${ru(clean.length)}).` : 'Пока проблем не найдено.';
   empty.textContent = message; empty.hidden = !message;
   $('#filterWrap').hidden = problems.length + clean.length < 2;
 }
@@ -254,7 +253,6 @@ window.onNativeEvent = (event) => {
       busy(true); resetResults();
       $('#totalCount').textContent = '0'; $('#findingCount').textContent = '0'; $('#speedText').textContent = '';
       $('#scan').hidden = false; $('#notice').hidden = true;
-      lastMode = $('#mode').value;
       $('#filter').value = ''; query = '';
       setShowAll(!!PREFS.all);
       verdict('scanning', 'Проверяем…', 'Можно свернуть окно — ответ появится здесь.');
