@@ -1,0 +1,31 @@
+# Rust build output and built binaries
+app/target/
+app/strazh
+app/vt-scan
+app/virustotal-local
+app/vt-watch
+
+# Bundled ClamAV (~70 MB of GPL binaries + database); rebuilt/fetched separately
+clamav/
+
+# Packaged releases
+dist/
+windows/dist/
+windows/publish/
+windows/dependencies/
+windows/Strazh/bin/
+windows/Strazh/obj/
+
+# Website lives in its own repo (losdek/strazh-website)
+website/
+
+# Local tool by-products
+investigation.cany/
+capture/
+checks/
+reference/
+build-activity.log
+craft.json
+feed.json
+usage.json
+Страж.desktop

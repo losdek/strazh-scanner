@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Strazh</AssemblyName><RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained><PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <EmbeddedResource Include="../../app/ui/index.html" LogicalName="ui.html" />
+    <EmbeddedResource Include="../../app/ui/src/style.css" LogicalName="ui.css" />
+    <EmbeddedResource Include="../../app/ui/src/main.js" LogicalName="ui.js" />
+    <EmbeddedResource Include="../../app/engine/data/loki-sha256.txt" LogicalName="hashes.txt" />
+  </ItemGroup>
+</Project>

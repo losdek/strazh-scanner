@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; worker-src 'none'">
+<title>Страж</title><!--STYLES--></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="mark" viewBox="0 0 100 89"><path fill-rule="evenodd" d="M50 2 90 18v29c0 20-16 34-40 40C26 81 10 67 10 47V18L50 2zm0 10L20 24v23c0 15 12 27 30 32 18-5 30-17 30-32V24L50 12zm-7 47L27 43l7-7 9 9 23-23 7 7-30 30z"/></symbol>
+</defs></svg>
+<div class="shell">
+<div class="wash" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div>
+<header class="topbar">
+  <span class="brand"><svg class="brand-mark"><use href="#mark"/></svg>Страж</span>
+  <button type="button" class="gear" id="settingsBtn" aria-expanded="false" aria-controls="settings" aria-label="Настройки" title="Настройки"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button>
+  <div class="menu" id="settings" hidden>
+    <p class="menu-title">Проверка</p>
+    <div class="seg" role="radiogroup" aria-label="Способ проверки"><i class="thumb"></i>
+      <button type="button" id="modeHashes" role="radio">Быстрая</button>
+      <button type="button" id="modeStatic" role="radio" data-on="true">Обычная</button>
+      <button type="button" id="modeClam" role="radio" disabled>ClamAV</button></div>
+    <p class="menu-note"><span class="dot" id="clamDot" data-state="off"></span><span id="clamInfo">ClamAV: проверяем…</span></p>
+    <p class="menu-title">Скорость</p>
+    <div class="seg" role="radiogroup" aria-label="Скорость"><i class="thumb"></i>
+      <button type="button" id="w1" role="radio">Тихо</button>
+      <button type="button" id="w2" role="radio" data-on="true">Норма</button>
+      <button type="button" id="w4" role="radio">Быстро</button></div>
+    <p class="menu-title">Папка «Загрузки»</p>
+    <div class="menu-row"><span class="dot" id="autoDot" data-state="off"></span><span id="autoStatus" role="status">Выключена</span><button type="button" id="autoToggle" class="btn btn-small" aria-pressed="false">Включить автопроверку</button></div>
+    <p class="menu-title">Оформление</p>
+    <div class="seg" role="radiogroup" aria-label="Тема"><i class="thumb"></i>
+      <button type="button" id="themeAuto" role="radio" data-on="true">Авто</button>
+      <button type="button" id="themeLight" role="radio">Светлая</button>
+      <button type="button" id="themeDark" role="radio">Тёмная</button></div>
+    <div class="toggles">
+      <button type="button" class="switch" id="optMotion" role="switch" aria-checked="true">Анимация</button>
+      <button type="button" class="switch" id="optSound" role="switch" aria-checked="false">Звук при угрозе</button>
+      <button type="button" class="switch" id="optHashes" role="switch" aria-checked="true">Показывать SHA-256</button>
+      <button type="button" class="switch" id="optAll" role="switch" aria-checked="false">Сразу показывать все файлы</button>
+    </div>
+    <p class="menu-title">База</p>
+    <div class="menu-row"><span><b id="databaseCount">1 175</b> известных угроз</span><button type="button" class="btn btn-small" id="import">Добавить свои</button></div>
+    <p class="menu-note" id="signatureInfo"></p>
+  </div>
+</header>
+<main class="main">
+<section class="hero" id="verdict" data-state="idle" aria-live="polite">
+  <div class="mark" aria-hidden="true">
+    <i class="ripple"></i><i class="ripple"></i><i class="ripple"></i><i class="sweep"></i>
+    <svg class="i-idle" viewBox="0 0 100 89"><use href="#mark"/></svg>
+    <span class="spinner"></span>
+    <svg class="i-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    <svg class="i-bad" viewBox="0 0 24 24"><path d="M12 5v9M12 18.5v.5"/></svg>
+  </div>
+  <h1 id="verdictTitle">Что проверим?</h1>
+  <p id="verdictText">Файлы не запускаются и не покидают компьютер.</p>
+  <p class="current" id="currentFile" aria-hidden="true"></p>
+  <div class="actions">
+    <button type="button" class="btn btn-primary" id="chooseFile">Выбрать файлы</button>
+    <button type="button" class="btn" id="chooseFolder">Выбрать папку</button>
+    <button type="button" class="btn btn-stop" id="cancel" disabled>Остановить</button>
+  </div>
+  <div class="quick" id="quick"><span>Быстро:</span>
+    <button type="button" class="chip" id="quickDownloads"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v10m0 0-4-4m4 4 4-4M5 19h14"/></svg>Загрузки</button>
+    <button type="button" class="chip" id="quickDesktop"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg>Рабочий стол</button>
+    <button type="button" class="chip" id="quickHome"><svg class="i" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>Домашняя папка</button></div>
+  <p class="last" id="lastScan"></p>
+  <div class="scan-bar" id="scanBar" role="progressbar" aria-label="Проверка"><div></div></div>
+  <div id="notice" class="notice" role="status" hidden></div>
+</section>
+<section class="results" id="scan" hidden>
+  <div class="results-head">
+    <span id="scanTitle" class="small">Результаты</span>
+    <span class="small">Файлов: <b id="totalCount">0</b> · Проблем: <b id="findingCount">0</b> <span id="speedText"></span></span>
+    <span class="results-tools"><button type="button" class="link" id="onlyProblemsBtn" aria-pressed="true">Показать все</button><button type="button" class="link" id="clear">Скрыть</button></span>
+  </div>
+  <ul class="scan-list" id="scanList"></ul>
+  <p class="small" id="scanStats"></p>
+</section>
+</main>
+<input type="hidden" id="mode" value="static"><input type="hidden" id="workers" value="2">
+</div>
+<!--SCRIPTS--></body></html>

@@ -1,0 +1,20 @@
+[package]
+name = "virustotal-local"
+version = "3.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+members = ["engine"]
+resolver = "2"
+
+[profile.release]
+lto = true
+strip = true
+
+[dependencies]
+scan-engine = { path = "engine" }
+
+[[bin]]
+name = "strazh"
+path = "src/main.rs"

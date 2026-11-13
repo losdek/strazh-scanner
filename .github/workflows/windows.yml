@@ -1,0 +1,39 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    paths: ['app/**', 'windows/**', '.github/workflows/windows.yml']
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Prepare Rust and installer compiler
+        shell: pwsh
+        run: |
+          rustup default stable
+          if (!(Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --no-progress -y }
+      - name: Build, test and package
+        shell: pwsh
+        run: ./windows/build.ps1
+      - name: Test installer and installed scanner
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'Strazh-installed'
+          $process = Start-Process windows/dist/Strazh-Setup-x64.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          if (!(Test-Path "$dest/Strazh.exe")) { throw 'Desktop executable missing' }
+          & "$dest/vt-scan.exe" --mode hashes --quiet app/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'Installed scanner failed' }
+          & ./windows/test-scanner.ps1 -Scanner "$dest/vt-scan.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Strazh-Windows-x64
+          path: windows/dist/Strazh-Setup-x64.exe
+          if-no-files-found: error
