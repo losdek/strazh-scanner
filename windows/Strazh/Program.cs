@@ -109,7 +109,7 @@ sealed class ScannerWindow : Form {
         web.CoreWebView2.WebMessageReceived += async (_, e) => {
             try { await Command(e.TryGetWebMessageAsString()); } catch(Exception ex) { await Notice(ex.Message); }
         };
-        var html = Resource("ui.html").Replace("<!--STYLES-->", "<style>"+Resource("ui.css")+"</style>")
+        var html = Resource("ui.html").Replace("<!--STYLES-->", "<style>"+Resource("ui-fonts.css")+Resource("ui.css")+"</style>")
             .Replace("<!--SCRIPTS-->", "<script>"+Resource("ui.js")+"</script>")
             .Replace("~/Downloads", "Downloads");
         web.CoreWebView2.NavigateToString(html);
