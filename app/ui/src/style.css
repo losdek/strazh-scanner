@@ -79,12 +79,24 @@ body:has([data-state=review]),body:has([data-state=partial]){background:linear-g
 .small{font-size:13px;color:var(--muted)}.small b{color:var(--text);font-weight:600}
 body:has([data-state=threat]) #findingCount{color:var(--bad)}body:has([data-state=review]) #findingCount{color:var(--warn)}
 .link{background:none;border:0;padding:0;font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}.link:hover{color:var(--text)}
-.scan-list{list-style:none;margin:12px 0;padding:0;max-height:40vh;overflow:auto}
-.scan-row{padding:11px 2px;border-bottom:1px solid var(--line);animation:row-in .3s cubic-bezier(.2,.8,.2,1) both}
+.scan-scroll{margin:12px 0;max-height:46vh;overflow:auto;overscroll-behavior:contain}
+.scan-list{list-style:none;margin:0;padding:0}
+.filter{display:flex;align-items:center;gap:8px;margin-top:12px;padding:0 10px;height:34px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--muted);transition:border-color .15s}
+.filter:focus-within{border-color:var(--muted)}
+.filter input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;font:inherit;font-size:14px;color:var(--text)}
+.filter input::placeholder{color:var(--muted)}
+.empty{padding:18px 4px;font-size:14px;color:var(--muted)}
+.group-head{position:sticky;top:0;z-index:1;margin-top:10px;padding:6px 2px;font-size:12px;color:var(--muted);background:var(--page);border-bottom:1px solid var(--line)}
+.more{display:block;margin:12px auto 4px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.scan-row{--tone:var(--muted);padding:11px 10px;border-bottom:1px solid var(--line);box-shadow:inset 3px 0 0 transparent;animation:row-in .3s cubic-bezier(.2,.8,.2,1) both;transition:background .15s}
+.scan-row:hover{background:color-mix(in srgb,var(--text) 3%,transparent)}
+#scanList .scan-row{box-shadow:inset 3px 0 0 var(--tone)}
 .scan-row-top{display:flex;gap:12px;align-items:baseline}
 .scan-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-.scan-meta{font-size:12px;color:var(--muted);white-space:nowrap}.scan-badge{font-size:12px;font-weight:600;white-space:nowrap;color:var(--muted)}
-.scan-row[data-tone=unknown] .scan-badge{color:var(--ok)}.scan-row[data-tone=bad] .scan-badge,.scan-row[data-tone=error] .scan-badge{color:var(--bad)}.scan-row[data-tone=review] .scan-badge{color:var(--warn)}
+.scan-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+.scan-badge{align-self:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;color:var(--tone);background:color-mix(in srgb,var(--tone) 14%,transparent)}
+.scan-row[data-tone=unknown]{--tone:var(--ok)}.scan-row[data-tone=bad]{--tone:var(--bad)}.scan-row[data-tone=review],.scan-row[data-tone=error]{--tone:var(--warn)}
 .scan-hash{font:11px/1.6 ui-monospace,monospace;color:var(--muted);word-break:break-all;user-select:all}
 .scan-details{font-size:13px;color:var(--muted);white-space:pre-wrap;margin-top:2px}
 /* фон-волна и зерно */
@@ -121,3 +133,10 @@ body:has([data-state=threat]) .wash{--wash:color-mix(in srgb,var(--bad) 14%,tran
 :root[data-hashes=off] .scan-hash{display:none}
 @media(max-width:560px){body{padding:0}.shell{border-radius:0;border:0}.main{padding:0 20px 28px}.menu{left:10px;right:10px;width:auto}.hero h1{font-size:28px}.actions .btn{flex:1 1 100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.i-ok path{stroke-dashoffset:0}.grain{display:none}}
+/* когда есть результаты, ответ сжимается — список виден без прокрутки */
+.main:has(.results:not([hidden])) .hero{margin:0;padding:36px 0 28px}
+.main:has(.results:not([hidden])) .mark{width:72px;height:72px;margin-bottom:24px}
+.main:has(.results:not([hidden])) .actions{margin-top:24px}
+.main:has(.results:not([hidden])) .quick{margin-top:18px}
+.main:has(.results:not([hidden])) .hero .last{display:none}
+.main:has(.results:not([hidden])) .hero h1{font-size:30px}

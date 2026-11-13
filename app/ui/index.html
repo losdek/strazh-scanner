@@ -23,7 +23,8 @@
       <button type="button" id="w2" role="radio" data-on="true">Норма</button>
       <button type="button" id="w4" role="radio">Быстро</button></div>
     <p class="menu-title">Папка «Загрузки»</p>
-    <div class="menu-row"><span class="dot" id="autoDot" data-state="off"></span><span id="autoStatus" role="status">Выключена</span><button type="button" id="autoToggle" class="btn btn-small" aria-pressed="false">Включить автопроверку</button></div>
+    <div class="menu-row"><span class="dot" id="autoDot" data-state="off"></span><span id="autoStatus" role="status">Автопроверка выключена</span><button type="button" id="autoToggle" class="btn btn-small" aria-pressed="false">Включить</button></div>
+    <p class="menu-note">Новые файлы проверяются, пока окно открыто.</p>
     <p class="menu-title">Оформление</p>
     <div class="seg" role="radiogroup" aria-label="Тема"><i class="thumb"></i>
       <button type="button" id="themeAuto" role="radio" data-on="true">Авто</button>
@@ -41,7 +42,7 @@
   </div>
 </header>
 <main class="main">
-<section class="hero" id="verdict" data-state="idle" aria-live="polite">
+<section class="hero" id="verdict" data-state="idle">
   <div class="mark" aria-hidden="true">
     <i class="ripple"></i><i class="ripple"></i><i class="ripple"></i><i class="sweep"></i>
     <svg class="i-idle" viewBox="0 0 100 89"><use href="#mark"/></svg>
@@ -67,14 +68,21 @@
 </section>
 <section class="results" id="scan" hidden>
   <div class="results-head">
-    <span id="scanTitle" class="small">Результаты</span>
     <span class="small">Файлов: <b id="totalCount">0</b> · Проблем: <b id="findingCount">0</b> <span id="speedText"></span></span>
-    <span class="results-tools"><button type="button" class="link" id="onlyProblemsBtn" aria-pressed="true">Показать все</button><button type="button" class="link" id="clear">Скрыть</button></span>
+    <span class="results-tools"><button type="button" class="link" id="onlyProblemsBtn" aria-pressed="true">Показать все</button><button type="button" class="link" id="clear">Очистить</button></span>
   </div>
-  <ul class="scan-list" id="scanList"></ul>
+  <label class="filter" id="filterWrap" hidden><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg><input type="search" id="filter" placeholder="Поиск по имени или SHA-256" aria-label="Поиск по результатам" autocomplete="off" spellcheck="false"></label>
+  <div class="scan-scroll">
+    <ul class="scan-list" id="scanList" aria-label="Проблемные файлы"></ul>
+    <p class="empty" id="emptyList" hidden></p>
+    <p class="group-head" id="cleanHead" hidden></p>
+    <ul class="scan-list" id="cleanList" aria-label="Чистые файлы" hidden></ul>
+    <button type="button" class="btn btn-small more" id="moreClean" hidden></button>
+  </div>
   <p class="small" id="scanStats"></p>
 </section>
 </main>
+<p class="sr-only" id="announce" role="status" aria-live="polite"></p>
 <input type="hidden" id="mode" value="static"><input type="hidden" id="workers" value="2">
 </div>
 <!--SCRIPTS--></body></html>
