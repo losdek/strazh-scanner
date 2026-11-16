@@ -104,19 +104,10 @@ fn enumerate(
                 }
             }
             Ok(m) if m.is_file() => {
-                let mut next = path;
-                loop {
-                    if cancel.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    match jobs.try_send(next) {
-                        Ok(()) => break,
-                        Err(mpsc::TrySendError::Full(path)) => {
-                            next = path;
-                            thread::sleep(std::time::Duration::from_micros(100));
-                        }
-                        Err(mpsc::TrySendError::Disconnected(_)) => return,
-                    }
+                // Blocks while the workers are busy. On cancel they keep draining
+                // the queue, so this returns promptly instead of polling.
+                if jobs.send(path).is_err() {
+                    return;
                 }
             }
             Ok(_) => {
@@ -151,9 +142,14 @@ pub fn start(paths: Vec<PathBuf>, config: Config, workers: usize) -> io::Result<
                     let config = &config;
                     scope.spawn(move || {
                         let mut buffer = vec![0u8; BUFFER_SIZE];
-                        while !flag.load(Ordering::Relaxed) {
+                        loop {
                             let job = jobs.lock().unwrap_or_else(|e| e.into_inner()).recv();
                             let Ok(path) = job else { break };
+                            // After cancel, drop queued jobs so the enumerator never
+                            // blocks on a full queue; it stops at its next check.
+                            if flag.load(Ordering::Relaxed) {
+                                continue;
+                            }
                             let result = scan_engine::inspect(
                                 &path,
                                 config,
@@ -163,11 +159,12 @@ pub fn start(paths: Vec<PathBuf>, config: Config, workers: usize) -> io::Result<
                             );
                             let report = match result {
                                 Ok(r) => r,
-                                Err(e) if e.kind() == io::ErrorKind::Interrupted => break,
+                                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                                 Err(e) => Report::error(path, e),
                             };
                             if !send(report, events, counts) {
-                                break;
+                                // Nobody is listening any more: stop the whole scan.
+                                flag.store(true, Ordering::Relaxed);
                             }
                         }
                     });
