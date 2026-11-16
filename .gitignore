@@ -16,7 +16,7 @@ windows/dependencies/
 windows/Strazh/bin/
 windows/Strazh/obj/
 
-# Website lives in its own repo (losdek/strazh-website)
+# Website lives in its own repo (losdek/strazh-site)
 website/
 
 # Local tool by-products

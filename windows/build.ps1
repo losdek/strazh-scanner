@@ -17,7 +17,7 @@ try {
   dotnet publish windows/Strazh/Strazh.csproj -c Release -r win-x64 --self-contained true -o $publish
   if ($LASTEXITCODE) { throw 'Windows UI build failed' }
   Copy-Item app/target/release/vt-scan.exe $publish -Force
-  Copy-Item README.md $publish -Force
+  Copy-Item windows/README.md $publish -Force
   Copy-Item app/engine/data/loki-sha256.txt $publish -Force
   # Bundled ClamAV for Windows (official Cisco Talos build), verified by SHA-256.
   $clamZip = Join-Path $deps 'clamav-1.5.4.win.x64.zip'

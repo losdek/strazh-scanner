@@ -58,7 +58,7 @@ UNIT
   echo 'ClamAV будет готов сразу после входа в систему.'
 fi
 install -m 644 "$source_dir/app/assets/strazh.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/strazh.svg"
-install -m 644 "$source_dir/README.md" "$install_dir/README.md"
+[ -f "$source_dir/README.md" ] && install -m 644 "$source_dir/README.md" "$install_dir/README.md"
 ln -sfn "$install_dir/bin/strazh" "$HOME/.local/bin/strazh"
 cat > "$HOME/.local/share/applications/strazh.desktop" <<DESKTOP
 [Desktop Entry]
