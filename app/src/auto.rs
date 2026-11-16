@@ -9,6 +9,8 @@ use std::{
     },
     time::{Duration, Instant, SystemTime},
 };
+/// A file must stay unchanged this long before it is scanned.
+const SETTLE: Duration = Duration::from_secs(10);
 pub struct Auto {
     pub files: Receiver<Vec<PathBuf>>,
     cancel: Arc<AtomicBool>,
@@ -61,6 +63,9 @@ fn visit(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
 }
 impl Auto {
     pub fn start(root: PathBuf) -> std::io::Result<Self> {
+        Self::watch(root, SETTLE)
+    }
+    fn watch(root: PathBuf, settle: Duration) -> std::io::Result<Self> {
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
         let (tx, rx) = mpsc::sync_channel(1);
@@ -69,6 +74,8 @@ impl Auto {
             .spawn(move || {
                 let mut known: HashMap<PathBuf, ((u64, SystemTime), Instant, bool)> =
                     HashMap::new();
+                // Files already in the folder are the baseline, not new downloads.
+                let mut baseline = true;
                 while !flag.load(Ordering::Relaxed) {
                     let mut paths = Vec::new();
                     visit(&root, &mut paths, 0);
@@ -79,17 +86,21 @@ impl Auto {
                         let Ok(time) = m.modified() else { continue };
                         current.insert(path.clone());
                         let stamp = (m.len(), time);
-                        let e = known
-                            .entry(path.clone())
-                            .or_insert((stamp, Instant::now(), false));
+                        // Something written in the last few seconds may still be downloading.
+                        let settled = baseline && time.elapsed().is_ok_and(|age| age >= settle);
+                        let e =
+                            known
+                                .entry(path.clone())
+                                .or_insert((stamp, Instant::now(), settled));
                         if e.0 != stamp {
                             *e = (stamp, Instant::now(), false);
                         }
-                        if !e.2 && e.1.elapsed() >= Duration::from_secs(10) && ready.len() < 32 {
+                        if !e.2 && e.1.elapsed() >= settle && ready.len() < 32 {
                             ready.push(path);
                         }
                     }
                     known.retain(|p, _| current.contains(p));
+                    baseline = false;
                     if !ready.is_empty() {
                         match tx.try_send(ready.clone()) {
                             Ok(()) => {
@@ -127,6 +138,27 @@ mod tests {
         std::fs::remove_file(sidecar).unwrap();
         assert!(!super::partial(&file));
         std::fs::remove_dir(dir).unwrap();
+    }
+    #[test]
+    fn existing_files_are_baseline_but_fresh_ones_are_scanned() {
+        use std::time::{Duration, SystemTime};
+        let dir = std::env::temp_dir().join(format!("strazh-auto-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let old = dir.join("old.zip");
+        std::fs::write(&old, b"downloaded last week").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(3600))
+            .unwrap();
+        let fresh = dir.join("fresh.zip");
+        std::fs::write(&fresh, b"still arriving").unwrap();
+        let auto = super::Auto::watch(dir.clone(), Duration::from_secs(1)).unwrap();
+        let batch = auto.files.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_eq!(batch, vec![fresh]);
+        drop(auto);
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn partials() {
