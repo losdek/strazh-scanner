@@ -353,31 +353,9 @@ fn parse_clam_response(response: &str) -> io::Result<Option<String>> {
         )))
     }
 }
-// Prefilter on the first byte instead of comparing a long signature at
-// every offset. Particularly useful for binary files and EICAR's 68-byte marker.
-fn contains_bytes(haystack: &[u8], pattern: &[u8]) -> bool {
-    if pattern.is_empty() {
-        return true;
-    }
-    let Some(last) = haystack.len().checked_sub(pattern.len()) else {
-        return false;
-    };
-    let mut offset = 0;
-    while offset <= last {
-        let Some(relative) = haystack[offset..=last]
-            .iter()
-            .position(|&b| b == pattern[0])
-        else {
-            return false;
-        };
-        offset += relative;
-        if &haystack[offset..offset + pattern.len()] == pattern {
-            return true;
-        }
-        offset += 1;
-    }
-    false
-}
+/// Bytes kept from the previous chunk so a pattern split across reads is still found.
+/// Must be at least the longest pattern (EICAR, 68 bytes) minus one.
+const OVERLAP: usize = 127;
 /// (finding label, patterns). Patterns are lowercase; any one hit sets the flag.
 const TEXT_RULES: &[(&str, &[&[u8]])] = &[
     (
@@ -428,43 +406,86 @@ const TEXT_RULES: &[(&str, &[&[u8]])] = &[
 ];
 const DOWNLOADERS: &[&[u8]] = &[b"curl ", b"wget ", b"downloadstring(", b"invoke-webrequest"];
 const EXECUTORS: &[&[u8]] = &[b"| sh", b"| bash", b"invoke-expression", b"iex(", b"iex "];
+/// Flag slots: one per `TEXT_RULES` entry, then downloader, then shell execution.
+const DOWNLOADER: usize = TEXT_RULES.len();
+const SHELL: usize = TEXT_RULES.len() + 1;
+struct Matchers {
+    eicar: memchr::memmem::Finder<'static>,
+    /// Every text pattern in one case-insensitive automaton: one pass per chunk
+    /// instead of one byte-by-byte search per pattern.
+    text: aho_corasick::AhoCorasick,
+    /// Pattern index → flag slot.
+    slot: Vec<usize>,
+}
+fn matchers() -> &'static Matchers {
+    static MATCHERS: std::sync::OnceLock<Matchers> = std::sync::OnceLock::new();
+    MATCHERS.get_or_init(|| {
+        let mut patterns: Vec<&[u8]> = Vec::new();
+        let mut slot = Vec::new();
+        let groups = TEXT_RULES
+            .iter()
+            .map(|(_, list)| *list)
+            .chain([DOWNLOADERS, EXECUTORS]);
+        for (index, list) in groups.enumerate() {
+            patterns.extend_from_slice(list);
+            slot.extend(std::iter::repeat_n(index, list.len()));
+        }
+        Matchers {
+            eicar: memchr::memmem::Finder::new(EICAR),
+            text: aho_corasick::AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .build(patterns)
+                .expect("built-in patterns are valid"),
+            slot,
+        }
+    })
+}
 struct ContentChecks {
     eicar: bool,
-    rules: [bool; TEXT_RULES.len()],
-    downloader: bool,
-    shell: bool,
+    flags: [bool; TEXT_RULES.len() + 2],
+    /// Tail of the bytes seen so far (at most `OVERLAP`).
     carry: Vec<u8>,
-    scratch: Vec<u8>,
+    /// `carry` followed by the head of the next chunk: the only bytes ever copied.
+    seam: Vec<u8>,
 }
 impl ContentChecks {
-    fn new(capacity: usize) -> Self {
+    fn new() -> Self {
         Self {
             eicar: false,
-            rules: [false; TEXT_RULES.len()],
-            downloader: false,
-            shell: false,
-            carry: Vec::with_capacity(128),
-            scratch: Vec::with_capacity(capacity + 128),
+            flags: [false; TEXT_RULES.len() + 2],
+            carry: Vec::with_capacity(OVERLAP),
+            seam: Vec::with_capacity(OVERLAP * 2),
+        }
+    }
+    fn search(&mut self, haystack: &[u8], text: bool) {
+        let m = matchers();
+        if !self.eicar {
+            self.eicar = m.eicar.find(haystack).is_some();
+        }
+        if text && !self.flags.iter().all(|&f| f) {
+            for hit in m.text.find_overlapping_iter(haystack) {
+                self.flags[m.slot[hit.pattern().as_usize()]] = true;
+            }
         }
     }
     fn feed(&mut self, bytes: &[u8], text: bool) {
-        self.scratch.clear();
-        self.scratch.extend_from_slice(&self.carry);
-        self.scratch.extend_from_slice(bytes);
-        self.carry.clear();
-        self.carry
-            .extend_from_slice(&self.scratch[self.scratch.len().saturating_sub(128)..]);
-        self.eicar |= contains_bytes(&self.scratch, EICAR);
-        if text {
-            self.scratch.make_ascii_lowercase();
-            let scratch = &self.scratch;
-            let any = |list: &[&[u8]]| list.iter().any(|p| contains_bytes(scratch, p));
-            for (flag, (_, patterns)) in self.rules.iter_mut().zip(TEXT_RULES) {
-                *flag |= any(patterns);
-            }
-            self.downloader |= any(DOWNLOADERS);
-            self.shell |= any(EXECUTORS);
+        // Matches that straddle the previous chunk and this one.
+        let mut seam = std::mem::take(&mut self.seam);
+        seam.clear();
+        seam.extend_from_slice(&self.carry);
+        seam.extend_from_slice(&bytes[..bytes.len().min(OVERLAP)]);
+        if !self.carry.is_empty() {
+            self.search(&seam, text);
         }
+        self.search(bytes, text);
+        self.carry.clear();
+        let tail = if bytes.len() >= OVERLAP { bytes } else { &seam };
+        self.carry
+            .extend_from_slice(&tail[tail.len().saturating_sub(OVERLAP)..]);
+        self.seam = seam;
+    }
+    fn rule(&self, index: usize) -> bool {
+        self.flags[index]
     }
 }
 /// `invoice.pdf.exe`: a document or media extension followed by a runnable one.
@@ -506,13 +527,7 @@ pub fn inspect(
     let mut hash = Sha256::new();
     let mut size = 0;
     let mut kind = T_EMPTY;
-    let mut checks = (config.mode != Mode::Hashes).then(|| {
-        ContentChecks::new(
-            buffer
-                .len()
-                .min(usize::try_from(before.len()).unwrap_or(usize::MAX)),
-        )
-    });
+    let mut checks = (config.mode != Mode::Hashes).then(ContentChecks::new);
     let mut clam_error = None;
     let mut clam = if config.mode == Mode::Clam {
         match config
@@ -588,13 +603,13 @@ pub fn inspect(
     }
     if let Some(checks) = checks {
         if matches!(kind, T_TEXT | T_SCRIPT) {
-            for (hit, (label, _)) in checks.rules.iter().zip(TEXT_RULES) {
-                if *hit {
+            for (index, (label, _)) in TEXT_RULES.iter().enumerate() {
+                if checks.rule(index) {
                     report.details.push(format!("Review: {label}"));
                 }
             }
         }
-        if checks.downloader && checks.shell {
+        if checks.rule(DOWNLOADER) && checks.rule(SHELL) {
             report.details.push(
                 "Review: downloader and shell execution constructs in the same script".into(),
             );
@@ -751,6 +766,18 @@ mod tests {
         assert_eq!(f.inspect(&Config::default(), 64).status, Status::Review);
         let f = Fixture::new(b"powershell -EncodedCommand ZWNobyBoZWxsbw==", "ps1");
         assert_eq!(f.inspect(&Config::default(), 5).status, Status::Review);
+    }
+    #[test]
+    fn overlapping_patterns_all_count() {
+        // "base64 -d |" and "| sh" share the pipe; both must be seen, at any chunk size.
+        let f = Fixture::new(b"#!/bin/sh\nWGET x.invalid -O- | BASE64 -D | sh\n", "sh");
+        for chunk in [1, 2, 7, 13, BUFFER_SIZE] {
+            let r = f.inspect(&Config::default(), chunk);
+            assert_eq!(r.status, Status::Review, "chunk {chunk}");
+            let all = r.details.join("\n");
+            assert!(all.contains("Base64 decoding"), "chunk {chunk}: {all}");
+            assert!(all.contains("downloader and shell"), "chunk {chunk}: {all}");
+        }
     }
     #[test]
     fn imported_hashes_and_invalid_lists() {
