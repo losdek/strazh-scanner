@@ -26,7 +26,11 @@ struct Ui {
     auto_scan: Cell<bool>,
     clamd: RefCell<Option<clamd::Clamd>>,
     clam_ready: Cell<bool>,
+    /// Ticks until the next ClamAV socket probe (probing every 150 ms tick is wasteful).
+    clam_probe_in: Cell<u32>,
 }
+/// Probe the ClamAV socket about once a second.
+const CLAM_PROBE_TICKS: u32 = 7;
 /// A folder from ~/.config/user-dirs.dirs (e.g. ~/Загрузки on Russian systems), else a fallback.
 fn user_dir(key: &str, fallback: &str) -> PathBuf {
     let home = std::env::var_os("HOME")
@@ -286,9 +290,15 @@ unsafe extern "C" fn tick(data: Widget) -> i32 {
             }
         }
     }
-    let clam_now = scan_engine::detect_clam().is_some();
-    if clam_now != ui.clam_ready.replace(clam_now) {
-        config(ui);
+    let probe_in = ui.clam_probe_in.get();
+    if probe_in == 0 {
+        ui.clam_probe_in.set(CLAM_PROBE_TICKS);
+        let clam_now = scan_engine::detect_clam().is_some();
+        if clam_now != ui.clam_ready.replace(clam_now) {
+            config(ui);
+        }
+    } else {
+        ui.clam_probe_in.set(probe_in - 1);
     }
     if ui.pending.get() {
         return 1;
@@ -396,6 +406,7 @@ fn main() {
             auto_scan: Cell::new(false),
             clamd: RefCell::new(clamd),
             clam_ready: Cell::new(false),
+            clam_probe_in: Cell::new(0),
         });
         let data = (&*ui as *const Ui).cast_mut().cast();
         let manager = webkit_web_view_get_user_content_manager(view);
@@ -414,6 +425,7 @@ fn main() {
             == 0
         {
             eprintln!("Cannot initialize native scanner bridge");
+            drop(ui.clamd.take()); // process::exit skips destructors; stop clamd first.
             std::process::exit(1);
         }
         g_signal_connect_data(

@@ -3,7 +3,11 @@ pub fn html() -> String {
     include_str!("../ui/index.html")
         .replace(
             "<!--STYLES-->",
-            &format!("<style>{}</style>", include_str!("../ui/src/style.css")),
+            &format!(
+                "<style>{}{}</style>",
+                include_str!("../ui/src/fonts.css"),
+                include_str!("../ui/src/style.css")
+            ),
         )
         .replace(
             "<!--SCRIPTS-->",

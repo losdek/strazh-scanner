@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <EmbeddedResource Include="../../app/ui/index.html" LogicalName="ui.html" />
+    <EmbeddedResource Include="../../app/ui/src/fonts.css" LogicalName="ui-fonts.css" />
     <EmbeddedResource Include="../../app/ui/src/style.css" LogicalName="ui.css" />
     <EmbeddedResource Include="../../app/ui/src/main.js" LogicalName="ui.js" />
     <EmbeddedResource Include="../../app/engine/data/loki-sha256.txt" LogicalName="hashes.txt" />
